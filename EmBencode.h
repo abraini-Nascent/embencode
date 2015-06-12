@@ -2,25 +2,33 @@
 /// Embedded bencode support, header definitions.
 // 2012-09-29 <jc@wippler.nl> http://opensource.org/licenses/mit-license.php
 
+#pragma once
+#ifndef _EMBENCODE_h
+#define _EMBENCODE_h
+
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 
 /// Encoder class to generate Bencode on the fly (no buffer storage needed).
+template <int bufLen>
 class EmBencode {
 public:
-  EmBencode () {}
+	char buffer[bufLen];
+	uint8_t buffIdx = 0;
+
+	EmBencode () {}
   
   /// Push a string out in Bencode format.
   /// @param str The zero-terminated string to send out (without trailing \0).
-  static void push (const char* str) {
+ void push (const char* str) {
     push(str, strlen(str));
   }
 
   /// Push arbitrary bytes in Bencode format.
   /// @param ptr Pointer to the data to send out.
   /// @param len Number of data bytes to send out.
-  static void push (const void* ptr, uint8_t len) {
+ void push (const void* ptr, uint8_t len) {
     PushCount(len);
     PushChar(':');
     PushData(ptr, len);
@@ -28,7 +36,7 @@ public:
 
   /// Push a signed integer in Bencode format.
   /// @param val The integer to send (this implementation supports 32 bits).
-  static void push (long val) {
+void push (long val) {
     PushChar('i');
     if (val < 0) {
       PushChar('-');
@@ -38,54 +46,74 @@ public:
     PushEnd();
   }
 
+   /// Push a zero interger in Bencode format.
+void pushZero() {
+	PushChar('i');
+	PushChar('0');
+	PushEnd();
+}
+
   /// Start a new new list. Must be matched with a call to endList().
   /// Entries can be nested with more calls to startList(), startDict(), etc.
-  static void startList () {
+void startList () {
     PushChar('l');
   }
 
   /// Terminate a list, started earlier with a call to startList().
-  static void endList () {
+void endList () {
     PushEnd();
   }
 
   /// Start a new new dictionary. Must be matched with a call to endDict().
   /// Dictionary entries must consist of a string key plus an arbitrary value.
   /// Entries can be nested with more calls to startList(), startDict(), etc.
-  static void startDict () {
+void startDict () {
     PushChar('d');
   }
 
   /// Terminate a dictionary, started earlier with a call to startDict().
-  static void endDict () {
+void endDict () {
     PushEnd();
   }
 
+void reset()
+{
+	memset(&buffer, 0, sizeof(buffer));
+	buffIdx = 0;
+}
+
 protected:
-  static void PushCount (uint32_t num) {
+void PushCount (uint32_t num) {
     char buf[11];
-    PushData(ultoa(num, buf, 10), strlen(buf));
+	ultoa(num, buf, 10);
+    PushData(buf, strlen(buf));
   }
 
-  static void PushEnd () {
+void PushEnd () {
     PushChar('e');
   }
 
-  static void PushData (const void* ptr, uint8_t len) {
-    for (const char* p = (const char*) ptr; len-- > 0; ++p)
+void PushData (const void* ptr, uint8_t len) {
+    for (const char* p = (const char*) ptr; len > 0; ++p, --len)
       PushChar(*p);
   }
 
   /// This function is not implemented in the library. It must be supplied by
   /// the caller to implement the actual writing of caharacters.
-  static void PushChar (char ch);
+void PushChar(char ch)
+{
+	buffer[buffIdx] = ch;
+	buffIdx++;
+}
+
 };
 
 /// Decoder enum
 enum { EMB_ANY, EMB_LEN, EMB_INT, EMB_STR };
-
+enum { T_STRING = 0, T_NUMBER = 251, T_DICT, T_LIST, T_POP, T_END };
 /// Decoder class, templated internal buffer to collect the incoming data.
-class EmBdecode<unsigned int bufLen> {
+template <int bufLen>
+class EmBdecode {
 protected:
 	char level, buffer[bufLen];
 	uint8_t count, next, last, state;
@@ -105,7 +133,7 @@ public:
   /// Initialize a decoder instance with the specified buffer space.
   /// @param buf Pointer to the buffer which will be used by the decoder.
   /// @param len Size of the buffer, must be in the range 50 to 255.
-  EmBdecode () 
+  EmBdecode()
   { 
 	  reset(); 
   }
@@ -221,3 +249,5 @@ public:
 	  return atol(buffer + last);
   };
 };
+
+#endif
