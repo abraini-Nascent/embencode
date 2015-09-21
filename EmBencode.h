@@ -14,7 +14,7 @@
 template <int bufLen>
 class EmBencode {
 public:
-	char buffer[bufLen];
+	uint8_t buffer[bufLen];
 	uint8_t buffIdx = 0;
 
 	EmBencode () {}
